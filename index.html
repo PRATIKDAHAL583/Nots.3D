@@ -1,0 +1,102 @@
+<!DOCTYPE html><html lang="hi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Physics Paper</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+*{box-sizing:border-box}body{margin:0;font:16px system-ui,sans-serif;background:#eceff4;color:#1b2333}
+button{background:#dde3ee;border:0;border-radius:8px;padding:9px 12px;font:inherit;color:inherit}button.p{background:#1976d2;color:#fff}button.on{background:#1976d2;color:#fff}
+input[type=text]{flex:1;padding:10px;border:1px solid #b9c3d6;border-radius:8px;font:inherit;min-width:0}
+.row{display:flex;gap:6px;align-items:center;padding:8px}
+.sec{background:#fff;margin:8px;padding:14px;border-radius:12px;display:flex;gap:8px;align-items:center}.sec b{flex:1}
+#fo{display:none;min-height:100vh}#pp{background:#fff;margin:6px;min-height:80vh;padding:12px;border-radius:6px;box-shadow:0 1px 4px #0003}
+#bx{float:left;width:200px;height:200px;margin:0 12px 8px 0;border:2px dashed #90a4c0;display:flex;align-items:center;justify-content:center;text-align:center;color:#7a889f;font-size:13px;overflow:hidden}
+#bx img{width:100%;height:100%;object-fit:contain}
+#tx{outline:none;min-height:70vh;line-height:1.6;color:#111}
+#ps{display:none}
+#dg{display:none;position:fixed;inset:0;background:#fff;flex-direction:column;z-index:9}
+#cv{flex:1;touch-action:none;min-height:0}#cv canvas{width:100%;height:100%;display:block}
+#tb{display:flex;gap:6px;overflow-x:auto;padding:8px;background:#eceff4}#tb button{white-space:nowrap}
+#ct{display:grid;grid-template-columns:repeat(4,1fr);gap:2px 8px;padding:4px 10px;font-size:10px;background:#eceff4}#ct input{width:100%}
+#r2{display:flex;flex-wrap:wrap;gap:6px;background:#eceff4;padding:4px 8px}
+</style></head><body>
+<div id="home"><div class="row"><h2 style="margin:0;flex:1">📚 Physics Folders</h2></div>
+<div class="row"><input type="text" id="fi" placeholder="Folder name (jaise Rigid Body)"><button class="p" onclick="nf()">Create</button></div><div id="fl"></div></div>
+
+<div id="fo"><div class="row"><button onclick="bk()">←</button><b id="fname" style="flex:1"></b><button onclick="mv(-1)">◀</button><span id="pg"></span><button onclick="mv(1)">▶</button><button onclick="addp()">＋</button></div>
+<div class="row" style="padding-top:0"><button class="p" id="ps" onclick="sp()">💾 Save paper</button></div>
+<div id="pp" onclick="if(event.target===this)$('tx').focus()"><div id="bx" onclick="od()"></div><div id="tx" contenteditable="true"></div></div></div>
+
+<div id="dg"><div class="row"><button onclick="cd()">✕</button><b style="flex:1">3D Diagram</b><button class="p" onclick="sd()">💾 Save</button></div>
+<div id="cv"></div><div id="ct"></div>
+<div id="r2"><button id="bd" onclick="tdm()">✏️ Draw: OFF</button><button id="bp" onclick="tpl()">Plane: Floor</button><button onclick="undo()">↩ Undo</button><button onclick="nx()">Select ▶</button><button onclick="del()">🗑</button><button onclick="zm(.8)">＋</button><button onclick="zm(1.25)">－</button></div>
+<div id="tb"></div></div>
+<script>
+const $=i=>document.getElementById(i),esc=s=>s.replace(/</g,'&lt;');
+let db={folders:[]};try{db=JSON.parse(localStorage.getItem('pl2'))||db}catch(e){}
+const st=()=>{try{localStorage.setItem('pl2',JSON.stringify(db))}catch(e){}};
+let F=null,pi=0;const np=()=>({id:Date.now(),html:'',objs:[],img:''});
+function home(){$('fl').innerHTML=db.folders.map(f=>`<div class="sec" onclick="of(${f.id})">📁<b>${esc(f.name)}</b><small>${f.pages.length} page</small><button onclick="event.stopPropagation();df(${f.id})">🗑</button></div>`).join('')}
+function nf(){const v=$('fi').value.trim();if(!v)return;db.folders.push({id:Date.now(),name:v,pages:[np()]});$('fi').value='';st();home()}
+function df(id){db.folders=db.folders.filter(f=>f.id!=id);st();home()}
+function of(id){F=db.folders.find(f=>f.id==id);pi=0;$('fname').textContent=F.name;$('home').style.display='none';$('fo').style.display='block';ld()}
+function ld(){const p=F.pages[pi];$('tx').innerHTML=p.html;$('bx').innerHTML=p.img?`<img src="${p.img}">`:'＋ Diagram<br>200×200<br>(tap karo)';$('pg').textContent=(pi+1)+'/'+F.pages.length;$('ps').style.display='none'}
+function sp(){F.pages[pi].html=$('tx').innerHTML;st();$('ps').style.display='none'}
+$('tx').oninput=()=>{$('ps').style.display='inline-block'};
+function mv(d){sp();pi=(pi+d+F.pages.length)%F.pages.length;ld()}
+function addp(){sp();F.pages.push(np());pi=F.pages.length-1;st();ld()}
+function bk(){sp();$('fo').style.display='none';$('home').style.display='block';home()}
+home();
+// ---- 3D (sab kuch lines se) ----
+let R,S,C,root,gr,objs=[],sel=null,th=.8,ph=1.1,rd=9,ray,dm=false,pl=0,prev=null,drw=null;
+const PL=[new THREE.Plane(new THREE.Vector3(0,1,0),0),new THREE.Plane(new THREE.Vector3(0,0,1),0),new THREE.Plane(new THREE.Vector3(1,0,0),0)],PN=['Floor','Front','Side'];
+const LB={cube:'🧊 Cube',cyl:'🛢️ Cylinder',axis:'Axis',par:'∥ Parallel axis',perp:'⟂ Perp axis',line:'📏 Line',seg:'Line segment',ray:'Ray',sheet:'Thin metal sheet'};
+$('tb').innerHTML=Object.keys(LB).map(k=>`<button onclick="add('${k}')">${LB[k]}</button>`).join('');
+$('ct').innerHTML=[['x',-4,4],['y',-4,4],['z',-4,4],['size',.3,3],['rot X',0,360],['rot Y',0,360],['rot Z',0,360]].map((s,i)=>`<label>${s[0]}<input type="range" id="s${i}" min="${s[1]}" max="${s[2]}" step="${i>3?5:.1}" oninput="upd()"></label>`).join('');
+const sn=x=>Math.round(x*2)/2;
+function hit(e){const r=R.domElement.getBoundingClientRect();ray.setFromCamera(new THREE.Vector2((e.clientX-r.left)/r.width*2-1,-((e.clientY-r.top)/r.height)*2+1),C);const v=new THREE.Vector3();if(!ray.ray.intersectPlane(PL[pl],v))return null;if(Math.max(Math.abs(v.x),Math.abs(v.y),Math.abs(v.z))>6)return null;return v.set(sn(v.x),sn(v.y),sn(v.z))}
+function init(){if(R)return;S=new THREE.Scene();S.background=new THREE.Color(0xffffff);C=new THREE.PerspectiveCamera(50,1,.1,100);R=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});R.setPixelRatio(Math.min(devicePixelRatio,2));$('cv').appendChild(R.domElement);
+gr=new THREE.GridHelper(10,20,0xbbbbbb,0xe6e6e6);S.add(gr);S.add(new THREE.AxesHelper(1.5));root=new THREE.Group();S.add(root);
+ray=new THREE.Raycaster();ray.params.Line.threshold=.2;
+let dn=null,m=0;
+R.domElement.onpointerdown=e=>{if(dm){const h=hit(e);if(h){drw=h;dn=null;prev=ln(h.toArray(),h.toArray(),0x1976d2);S.add(prev);return}}dn=[e.clientX,e.clientY];m=0};
+addEventListener('pointermove',e=>{if(drw){const h=hit(e);if(h){S.remove(prev);prev=ln(drw.toArray(),h.toArray(),0x1976d2);S.add(prev)}return}
+if(!dn)return;const dx=e.clientX-dn[0],dy=e.clientY-dn[1];m+=Math.abs(dx)+Math.abs(dy);th-=dx*.01;ph=Math.max(.15,Math.min(3,ph-dy*.01));dn=[e.clientX,e.clientY]});
+addEventListener('pointerup',e=>{if(drw){S.remove(prev);prev=null;const h=hit(e);if(h&&h.distanceTo(drw)>.1){put({t:'dl',a:drw.toArray(),b:h.toArray(),p:[0,0,0],s:1,r:[0,0,0]})}drw=null;return}
+if(!dn)return;dn=null;if(m<6){const r=R.domElement.getBoundingClientRect();ray.setFromCamera(new THREE.Vector2((e.clientX-r.left)/r.width*2-1,-((e.clientY-r.top)/r.height)*2+1),C);const h=ray.intersectObjects(root.children,true)[0];if(h){let o=h.object;while(o.parent!==root)o=o.parent;pick(objs.find(x=>x.g===o))}}});
+R.domElement.onwheel=e=>zm(e.deltaY>0?1.1:.9);
+(function a(){requestAnimationFrame(a);const w=$('cv').clientWidth,h=$('cv').clientHeight;if(!w||!h)return;if(R.domElement.width!==Math.round(w*R.getPixelRatio())||R.domElement.height!==Math.round(h*R.getPixelRatio())){R.setSize(w,h,false);C.aspect=w/h;C.updateProjectionMatrix()}
+C.position.set(rd*Math.sin(ph)*Math.sin(th),rd*Math.cos(ph),rd*Math.sin(ph)*Math.cos(th));C.lookAt(0,0,0);R.render(S,C)})()}
+const zm=k=>{rd=Math.max(3,Math.min(25,rd*k))};
+function tdm(){dm=!dm;$('bd').textContent='✏️ Draw: '+(dm?'ON':'OFF');$('bd').className=dm?'on':''}
+function tpl(){pl=(pl+1)%3;$('bp').textContent='Plane: '+PN[pl];gr.rotation.set(pl==1?Math.PI/2:0,0,pl==2?Math.PI/2:0)}
+function ln(a,b,c,dash){const g=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(...a),new THREE.Vector3(...b)]);const l=new THREE.Line(g,dash?new THREE.LineDashedMaterial({color:c,dashSize:.2,gapSize:.12}):new THREE.LineBasicMaterial({color:c}));l.computeLineDistances();return l}
+function pts(p,c){return new THREE.Line(new THREE.BufferGeometry().setFromPoints(p.map(q=>new THREE.Vector3(...q))),new THREE.LineBasicMaterial({color:c}))}
+function circ(y,r){const p=[];for(let i=0;i<=48;i++){const a=i/48*Math.PI*2;p.push([r*Math.cos(a),y,r*Math.sin(a)])}return pts(p,0)}
+function box(w,h,d){const x=w/2,y=h/2,z=d/2,g=new THREE.Group(),A=[[-x,-y,-z],[x,-y,-z],[x,-y,z],[-x,-y,z]],B=A.map(q=>[q[0],y,q[2]]);
+g.add(pts([...A,A[0]],0),pts([...B,B[0]],0));for(let i=0;i<4;i++)g.add(pts([A[i],B[i]],0));return g}
+function tip(p,rx,rz){const m=new THREE.Mesh(new THREE.ConeGeometry(.09,.3,12),new THREE.MeshBasicMaterial({color:0}));m.position.set(...p);m.rotation.x=rx||0;m.rotation.z=rz||0;return m}
+function dot(p){const m=new THREE.Mesh(new THREE.SphereGeometry(.08,12,12),new THREE.MeshBasicMaterial({color:0}));m.position.set(...p);return m}
+function mk(t,o){const g=new THREE.Group();
+if(t=='cube')return box(1.5,1.5,1.5);
+if(t=='sheet')return box(2.6,.05,2);
+if(t=='cyl'){g.add(circ(.9,.7),circ(-.9,.7));[[.7,0],[-.7,0],[0,.7],[0,-.7]].forEach(q=>g.add(pts([[q[0],-.9,q[1]],[q[0],.9,q[1]]],0)));return g}
+if(t=='dl')g.add(ln(o.a,o.b,0));
+if(t=='axis')g.add(ln([0,-2.5,0],[0,2.5,0],0),tip([0,2.5,0]));
+if(t=='par')g.add(ln([0,-2.5,0],[0,2.5,0],0,1),tip([0,2.5,0]));
+if(t=='perp')g.add(ln([0,0,-2.5],[0,0,2.5],0),tip([0,0,2.5],Math.PI/2));
+if(t=='line')g.add(ln([-3,0,0],[3,0,0],0));
+if(t=='seg')g.add(ln([-1.2,0,0],[1.2,0,0],0),dot([-1.2,0,0]),dot([1.2,0,0]));
+if(t=='ray')g.add(ln([0,0,0],[3,0,0],0),dot([0,0,0]),tip([3,0,0],0,-Math.PI/2));
+return g}
+function rot(o){const k=Math.PI/180;o.g.rotation.set(o.r[0]*k,o.r[1]*k,o.r[2]*k)}
+function put(o){if(!Array.isArray(o.r))o.r=[0,0,o.r||0];const g=mk(o.t,o);g.position.set(...o.p);g.scale.setScalar(o.s);o.g=g;rot(o);root.add(g);objs.push(o);return o}
+function add(t){put({t,p:[t=='par'?1.2:0,['sheet','cube','cyl'].includes(t)?.9:0,0],s:1,r:[0,0,0]});pick(objs[objs.length-1])}
+function pick(o){sel=o||null;if(!o)return;[o.p[0],o.p[1],o.p[2],o.s,o.r[0],o.r[1],o.r[2]].forEach((v,i)=>$('s'+i).value=v);objs.forEach(x=>x.g.traverse(m=>{if(m.material&&m.material.color)m.material.color.setHex(x===o?0x1976d2:0)}))}
+function upd(){if(!sel)return;const v=i=>+$('s'+i).value;sel.p=[v(0),v(1),v(2)];sel.s=v(3);sel.r=[v(4),v(5),v(6)];sel.g.position.set(...sel.p);sel.g.scale.setScalar(sel.s);rot(sel)}
+function nx(){if(objs.length)pick(objs[(objs.indexOf(sel)+1)%objs.length])}
+function del(){if(!sel)return;root.remove(sel.g);objs=objs.filter(x=>x!==sel);sel=null}
+function undo(){const o=objs.pop();if(o){root.remove(o.g);if(sel===o)sel=null}}
+function od(){init();while(root.children.length)root.remove(root.children[0]);objs=[];sel=null;F.pages[pi].objs.forEach(o=>put({...o}));th=.8;ph=1.1;rd=9;$('dg').style.display='flex'}
+function cd(){$('dg').style.display='none'}
+function sd(){const p=F.pages[pi];p.objs=objs.map(o=>({t:o.t,p:o.p,s:o.s,r:o.r,a:o.a,b:o.b}));
+try{objs.forEach(x=>x.g.traverse(m=>{if(m.material&&m.material.color)m.material.color.setHex(0)}));R.render(S,C);const c=document.createElement('canvas');c.width=c.height=600;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,600,600);const s=R.domElement,k=Math.min(600/s.width,600/s.height),w=s.width*k,h=s.height*k;x.drawImage(s,(600-w)/2,(600-h)/2,w,h);p.img=c.toDataURL('image/jpeg',.9)}catch(e){}
+st();cd();ld();$('tx').innerHTML=p.html}
+</script></body></html>
